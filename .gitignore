@@ -1,0 +1,3 @@
+cmd/verto-cli/verto-cli
+*.swp
+.DS_Store
