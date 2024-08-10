@@ -17,25 +17,18 @@ func e(text string) {
 	os.Exit(1)
 }
 
-type ConfigArguments struct {
+type AppArguments struct {
 	VendorSpecified   bool
 	VendorName        string
 	ReadFileSpecified bool
 	ReadFile          string
 }
 
-func parseArgs() ConfigArguments {
-	a := ConfigArguments{}
+func parseArgs() AppArguments {
+	a := AppArguments{}
 
 	for i, arg := range os.Args {
 		switch arg {
-		case "-t":
-			a.VendorSpecified = true
-			if len(os.Args) >= i+2 {
-				a.VendorName = os.Args[i+1]
-			} else {
-				e("missing vendor")
-			}
 		case "-f":
 			a.ReadFileSpecified = true
 			if len(os.Args) >= i+2 {
@@ -43,6 +36,16 @@ func parseArgs() ConfigArguments {
 			} else {
 				e("missing filename")
 			}
+		case "-t":
+			a.VendorSpecified = true
+			if len(os.Args) >= i+2 {
+				a.VendorName = os.Args[i+1]
+			} else {
+				e("missing vendor")
+			}
+		case "-v":
+			fmt.Fprintf(os.Stdout, "%s %s\n", AppName, Version)
+			os.Exit(0)
 		}
 	}
 
@@ -50,44 +53,54 @@ func parseArgs() ConfigArguments {
 }
 
 func loadDataFromFile(filename string) ([]byte, error) {
-	d, err := os.ReadFile(filename)
-	if err != nil {
-		return []byte{}, err
+	d, readErr := os.ReadFile(filename)
+	if readErr != nil {
+		return []byte{}, readErr
 	}
 
 	return d, nil
 }
 
-func main() {
-	fmt.Fprintf(os.Stdout, "%s %s\n", AppName, Version)
-	a := parseArgs()
-
-	var d []byte
-	if a.ReadFileSpecified {
-		var loadErr error
-		d, loadErr = loadDataFromFile(a.ReadFile)
-		if loadErr != nil {
-			e(loadErr.Error())
-		}
-	} else {
-		d = []byte{}
+func parseDataFromFile(importer importer.Importer, filename string) error {
+	d, loadErr := loadDataFromFile(filename)
+	if loadErr != nil {
+		return loadErr
 	}
+
+	parseErr := parser.Parse(importer, string(d))
+	if parseErr != nil {
+		return parseErr
+	}
+
+	return nil
+}
+
+func selectVendorImporter(vendor string) (importer.Importer, error) {
+	switch vendor {
+	case "fortigate":
+		return importer.FortiOSImporter{}, nil
+	default:
+		return nil, fmt.Errorf("unknown vendor")
+	}
+}
+
+func main() {
+	a := parseArgs()
 
 	var i importer.Importer
 	if a.VendorSpecified {
-		switch a.VendorName {
-		case "fortigate":
-			i = importer.FortiOSImporter{}
-		default:
-			e("unknown vendor")
+		var vendErr error
+		i, vendErr = selectVendorImporter(a.VendorName)
+		if vendErr != nil {
+			e(vendErr.Error())
 		}
-	} else {
-		e("undefined vendor")
 	}
 
-	parseErr := parser.Parse(i, string(d))
-	if parseErr != nil {
-		e(parseErr.Error())
+	if a.ReadFileSpecified {
+		parseErr := parseDataFromFile(i, a.ReadFile)
+		if parseErr != nil {
+			e(parseErr.Error())
+		}
 	}
 
 	os.Exit(0)
