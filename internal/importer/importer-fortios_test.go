@@ -16,11 +16,11 @@ func loadTestFile(filename string) ([]byte, error) {
 }
 
 func TestNewFortiOSImporter(t *testing.T) {
-	s, e := loadTestFile("testdata/fortigate.conf")
+	s, e := loadTestFile("testdata/fortigate-cgustave.conf")
 	if e != nil {
 		t.Fatalf("%v\n", e)
 	}
-	i := FortiOSImporter{}
+	i := NewFortiOSImporter()
 	d := i.ImportFromText(string(s))
 	fmt.Fprintf(os.Stdout, "%s\n", d)
 }
