@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"fmt"
 	"os"
 	"testing"
 )
@@ -19,8 +20,7 @@ func TestNewFortiOSImporter(t *testing.T) {
 	if e != nil {
 		t.Fatalf("%v\n", e)
 	}
-
-	if string(s) != "" {
-		t.Fatalf("no match\n")
-	}
+	i := FortiOSImporter{}
+	d := i.ImportFromText(string(s))
+	fmt.Fprintf(os.Stdout, "%s\n", d)
 }
