@@ -18,10 +18,10 @@ func e(text string) {
 }
 
 type ConfigArguments struct {
-	VendorSpecified bool
-	VendorName      string
-	ReadFromFile    bool
-	ReadFilename    string
+	VendorSpecified   bool
+	VendorName        string
+	ReadFileSpecified bool
+	ReadFile          string
 }
 
 func parseArgs() ConfigArguments {
@@ -37,9 +37,9 @@ func parseArgs() ConfigArguments {
 				e("missing vendor")
 			}
 		case "-f":
-			a.ReadFromFile = true
+			a.ReadFileSpecified = true
 			if len(os.Args) >= i+2 {
-				a.ReadFilename = os.Args[i+1]
+				a.ReadFile = os.Args[i+1]
 			} else {
 				e("missing filename")
 			}
@@ -63,9 +63,9 @@ func main() {
 	a := parseArgs()
 
 	var d []byte
-	if a.ReadFromFile {
+	if a.ReadFileSpecified {
 		var loadErr error
-		d, loadErr = loadDataFromFile(a.ReadFilename)
+		d, loadErr = loadDataFromFile(a.ReadFile)
 		if loadErr != nil {
 			e(loadErr.Error())
 		}
