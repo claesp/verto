@@ -14,7 +14,7 @@ type FortiOSRow struct {
 }
 
 func (r FortiOSRow) String() string {
-	return fmt.Sprintf("%6d: %s", r.RowNumber, r.Cols)
+	return fmt.Sprintf("%6d: '%s'", r.RowNumber, r.Data)
 }
 
 type FortiOSSection struct {
@@ -44,10 +44,6 @@ func (s FortiOSSection) String() string {
 		o = fmt.Sprintf("%s\n%s: %s", o, fmt.Sprintf("%s/%s", s.Parent.Name, s.Name), cmd)
 	}
 
-	for _, row := range s.Rows {
-		o = fmt.Sprintf("%s\n%s: %s", o, fmt.Sprintf("%s/%s", s.Parent.Name, s.Name), row)
-	}
-
 	for _, sec := range s.Sections {
 		o = fmt.Sprintf("%s\n%s", o, sec)
 	}
@@ -68,6 +64,18 @@ func (s *FortiOSSection) RowCount() int {
 }
 
 type FortiOSImporter struct {
+	Section FortiOSSection
+}
+
+func NewFortiOSImporter() FortiOSImporter {
+	return NewFortiOSImporterWithSection(NewFortiOSSection(FortiOSRow{Data: "root"}, &FortiOSSection{Name: "root", Parent: &FortiOSSection{Name: "-"}}))
+}
+
+func NewFortiOSImporterWithSection(section FortiOSSection) FortiOSImporter {
+	o := FortiOSImporter{}
+	o.Section = section
+
+	return o
 }
 
 func (f FortiOSImporter) parseRows(inRows []string) []FortiOSRow {
@@ -75,10 +83,13 @@ func (f FortiOSImporter) parseRows(inRows []string) []FortiOSRow {
 
 	for idx := 0; idx < len(inRows); idx++ {
 		inRow := inRows[idx]
+		cols := strings.Split(strings.TrimLeft(inRow, " "), " ")
+		first := cols[0]
+		rest := strings.Join(cols[1:], " ")
 		outRow := FortiOSRow{
 			RowNumber: idx + 1,
 			Data:      inRow,
-			Cols:      strings.Split(strings.TrimLeft(inRow, " "), " "),
+			Cols:      []string{first, rest},
 		}
 		outRows = append(outRows, outRow)
 	}
@@ -93,6 +104,10 @@ type FortiOSCommand struct {
 }
 
 func (c FortiOSCommand) String() string {
+	if c.Row != nil {
+		return fmt.Sprintf("%s: %s (%d)", c.Type, c.Command, c.Row.RowNumber)
+	}
+
 	return fmt.Sprintf("%s: %s", c.Type, c.Command)
 }
 
@@ -112,6 +127,10 @@ func (t FortiOSCommandType) String() string {
 		return "EDIT"
 	case FortiOSCommandTypeConfig:
 		return "CONFIG"
+	case FortiOSCommandTypeComment:
+		return "COMMENT"
+	case FortiOSCommandTypeUnset:
+		return "UNSET"
 	default:
 		return "UNDEFINED"
 	}
@@ -124,27 +143,41 @@ const (
 	FortiOSCommandTypeEnd
 	FortiOSCommandTypeEdit
 	FortiOSCommandTypeConfig
+	FortiOSCommandTypeComment
+	FortiOSCommandTypeUnset
 )
 
 func NewFortiOSCommand(row FortiOSRow) FortiOSCommand {
 	o := FortiOSCommand{}
-	switch row.Cols[0] {
-	case "set":
-		o.Type = FortiOSCommandTypeSet
-	case "next":
-		o.Type = FortiOSCommandTypeNext
-	case "end":
-		o.Type = FortiOSCommandTypeEnd
-	case "edit":
-		o.Type = FortiOSCommandTypeEdit
-	case "config":
-		o.Type = FortiOSCommandTypeConfig
-	default:
+	if len(row.Cols) != 0 {
+		switch row.Cols[0] {
+		case "set":
+			o.Type = FortiOSCommandTypeSet
+		case "next":
+			o.Type = FortiOSCommandTypeNext
+		case "end":
+			o.Type = FortiOSCommandTypeEnd
+		case "edit":
+			o.Type = FortiOSCommandTypeEdit
+		case "config":
+			o.Type = FortiOSCommandTypeConfig
+		case "unset":
+			o.Type = FortiOSCommandTypeUnset
+		default:
+			o.Type = FortiOSCommandTypeUnknown
+		}
+	} else {
 		o.Type = FortiOSCommandTypeUnknown
 	}
 
 	if len(row.Cols) > 1 {
-		o.Command = row.Cols[1]
+		o.Command = strings.Join(row.Cols, " ")
+	}
+
+	if o.Type == FortiOSCommandTypeUnknown {
+		if len(o.Command) > 0 && o.Command[0] == '#' {
+			o.Type = FortiOSCommandTypeComment
+		}
 	}
 
 	o.Row = &row
@@ -177,13 +210,11 @@ func (f FortiOSImporter) parseSections(rows []FortiOSRow, section *FortiOSSectio
 	}
 }
 
-func (f FortiOSImporter) ImportFromText(s string) types.VertoDevice {
-	rows := strings.Split(s, "\n")
-	osRows := f.parseRows(rows)
-	firstSection := NewFortiOSSection(osRows[0], &FortiOSSection{Name: "root"})
-	f.parseSections(osRows[1:], &firstSection)
-	fmt.Fprintf(os.Stdout, "%s\n", firstSection)
+func (f *FortiOSImporter) ImportFromText(s string) types.VertoDevice {
+	rows := f.parseRows(strings.Split(s, "\n"))
+	f.parseSections(rows[1:], &f.Section)
 
+	fmt.Fprintf(os.Stdout, "%s", f.Section)
 	d := types.VertoDevice{}
 
 	return d
