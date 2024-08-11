@@ -7,5 +7,5 @@ import (
 type ExcelExporter struct {
 }
 
-func (e *ExcelExporter) ExportToFile(vd types.VertoDevice) {
+func (e *ExcelExporter) Export(vd types.VertoDevice) {
 }

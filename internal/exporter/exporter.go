@@ -5,5 +5,5 @@ import (
 )
 
 type Exporter interface {
-	ExportToFile(types.VertoDevice)
+	Export(types.VertoDevice)
 }
