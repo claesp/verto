@@ -1,15 +1,24 @@
 package parser
 
 import (
-	"fmt"
 	"github.com/claesp/verto/internal/importer"
-	"os"
+	"github.com/claesp/verto/internal/types"
 )
 
-func Parse(imp importer.Importer, filename string) error {
-	d := imp.ImportFromText("test")
+func Parse(importer importer.Importer, data []byte) (types.VertoDevice, error) {
+	var d types.VertoDevice
 
-	fmt.Fprintf(os.Stdout, "%s\n", d.Hostname)
+	ie := importer.Import(string(data))
+	if ie != nil {
+		return d, ie
+	}
 
-	return nil
+	pe := importer.Parse()
+	if pe != nil {
+		return d, pe
+	}
+
+	d = importer.ExtractDevice()
+
+	return d, nil
 }
