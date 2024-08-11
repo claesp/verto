@@ -3,7 +3,6 @@ package importer
 import (
 	"fmt"
 	"github.com/claesp/verto/internal/types"
-	"os"
 	"strings"
 )
 
@@ -215,13 +214,12 @@ func (f FortiOSImporter) parseSections(rows []FortiOSRow, section *FortiOSSectio
 func (f FortiOSImporter) Import(s string) error {
 	rows := f.parseRows(strings.Split(s, "\n"))
 	f.parseSections(rows[1:], &f.Section)
-	fmt.Fprintf(os.Stdout, "%s", f.Section)
 
 	return nil
 }
 
 func (f FortiOSImporter) Parse() error {
-	return fmt.Errorf("not implemented")
+	return nil
 }
 
 func (f FortiOSImporter) ExtractDevice() types.VertoDevice {
