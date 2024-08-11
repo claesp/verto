@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+type Importer interface {
+	Import([]byte) error
+}
+
 type FortiOSRow struct {
 	RowNumber int
 	Data      string
@@ -50,7 +54,7 @@ func (s FortiOSSection) String() string {
 	return o
 }
 
-func (s *FortiOSSection) RowCount() int {
+func (s FortiOSSection) RowCount() int {
 	r := 0
 
 	r += len(s.Rows)
@@ -78,7 +82,7 @@ func NewFortiOSImporterWithSection(section FortiOSSection) FortiOSImporter {
 	return o
 }
 
-func (f FortiOSImporter) parseRows(inRows []string) []FortiOSRow {
+func (f *FortiOSImporter) parseRows(inRows []string) []FortiOSRow {
 	outRows := make([]FortiOSRow, 0)
 
 	for idx := 0; idx < len(inRows); idx++ {
@@ -185,11 +189,11 @@ func NewFortiOSCommand(row FortiOSRow) FortiOSCommand {
 	return o
 }
 
-func (f FortiOSImporter) parseCommand(row FortiOSRow) FortiOSCommand {
+func (f *FortiOSImporter) parseCommand(row FortiOSRow) FortiOSCommand {
 	return NewFortiOSCommand(row)
 }
 
-func (f FortiOSImporter) parseSections(rows []FortiOSRow, section *FortiOSSection) {
+func (f *FortiOSImporter) parseSections(rows []FortiOSRow, section *FortiOSSection) {
 	for i := 0; i < len(rows); i++ {
 		row := rows[i]
 
@@ -211,17 +215,11 @@ func (f FortiOSImporter) parseSections(rows []FortiOSRow, section *FortiOSSectio
 	}
 }
 
-func (f FortiOSImporter) Import(s string) error {
-	rows := f.parseRows(strings.Split(s, "\n"))
+func (f FortiOSImporter) Import(data []byte) error {
+	rows := f.parseRows(strings.Split(string(data), "\n"))
 	f.parseSections(rows[1:], &f.Section)
 
-	return nil
-}
+	fmt.Println(f.Section)
 
-func (f FortiOSImporter) Parse() error {
 	return nil
-}
-
-func (f FortiOSImporter) ExtractDevice() types.VertoDevice {
-	return f.Device
 }

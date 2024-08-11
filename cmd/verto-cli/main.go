@@ -84,18 +84,20 @@ func loadDataFromFile(filename string) ([]byte, error) {
 	return d, nil
 }
 
-func parseDataFromFile(importer importer.Importer, filename string) (types.VertoDevice, error) {
+func parseDataFromFile(imp importer.Importer, par parser.Parser, filename string) (types.VertoDevice, error) {
 	var device types.VertoDevice
-	if importer == nil {
-		return device, fmt.Errorf("missing importer")
-	}
 
 	data, loadErr := loadDataFromFile(filename)
 	if loadErr != nil {
 		return device, loadErr
 	}
 
-	device, parseErr := parser.Parse(importer, data)
+	importErr := imp.Import(data)
+	if importErr != nil {
+		return device, importErr
+	}
+
+	device, parseErr := par.Parse(imp)
 	if parseErr != nil {
 		return device, parseErr
 	}
@@ -103,12 +105,12 @@ func parseDataFromFile(importer importer.Importer, filename string) (types.Verto
 	return device, nil
 }
 
-func selectVendorImporter(vendor string) (importer.Importer, error) {
+func selectVendorImporter(vendor string) (importer.Importer, parser.Parser, error) {
 	switch vendor {
 	case "fortigate":
-		return importer.NewFortiOSImporter(), nil
+		return importer.NewFortiOSImporter(), parser.NewFortiOSTextParser(), nil
 	default:
-		return nil, fmt.Errorf("unknown import vendor")
+		return nil, nil, fmt.Errorf("unknown import vendor")
 	}
 }
 
@@ -128,10 +130,11 @@ func main() {
 
 	a := parseArgs()
 
-	var imp importer.Importer
+	var impImpl importer.Importer
+	var importParser parser.Parser
 	if a.ImportVendorSpecified {
 		var importErr error
-		imp, importErr = selectVendorImporter(a.ImportVendorName)
+		impImpl, importParser, importErr = selectVendorImporter(a.ImportVendorName)
 		if importErr != nil {
 			e(importErr.Error())
 		}
@@ -139,10 +142,10 @@ func main() {
 		e("missing importer")
 	}
 
-	var exp exporter.Exporter
+	var expImpl exporter.Exporter
 	if a.ExportVendorSpecified {
 		var exportErr error
-		exp, exportErr = selectVendorExporter(a.ExportVendorName)
+		expImpl, exportErr = selectVendorExporter(a.ExportVendorName)
 		if exportErr != nil {
 			e(exportErr.Error())
 		}
@@ -151,12 +154,12 @@ func main() {
 	}
 
 	if a.ReadFileSpecified {
-		device, parseErr := parseDataFromFile(imp, a.ReadFile)
+		device, parseErr := parseDataFromFile(impImpl, importParser, a.ReadFile)
 		if parseErr != nil {
 			e(parseErr.Error())
 		}
 
-		exp.Export(device)
+		expImpl.Export(device)
 	} else {
 		e("no filename specified")
 	}
