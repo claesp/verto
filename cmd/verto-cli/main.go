@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/claesp/verto/internal/importer"
 	"github.com/claesp/verto/internal/parser"
-	"os"
+	"github.com/claesp/verto/internal/types"
 )
 
 var (
@@ -15,6 +17,11 @@ var (
 func e(text string) {
 	fmt.Fprintf(os.Stderr, "error: %s\n", text)
 	os.Exit(1)
+}
+
+func o(text string) {
+	fmt.Fprintf(os.Stdout, "%s\n", text)
+	os.Exit(0)
 }
 
 type AppArguments struct {
@@ -61,24 +68,26 @@ func loadDataFromFile(filename string) ([]byte, error) {
 	return d, nil
 }
 
-func parseDataFromFile(importer importer.Importer, filename string) error {
-	d, loadErr := loadDataFromFile(filename)
+func parseDataFromFile(importer importer.Importer, filename string) (types.VertoDevice, error) {
+	var device types.VertoDevice
+
+	data, loadErr := loadDataFromFile(filename)
 	if loadErr != nil {
-		return loadErr
+		return device, loadErr
 	}
 
-	parseErr := parser.Parse(importer, string(d))
+	device, parseErr := parser.Parse(importer, data)
 	if parseErr != nil {
-		return parseErr
+		return device, parseErr
 	}
 
-	return nil
+	return device, nil
 }
 
 func selectVendorImporter(vendor string) (importer.Importer, error) {
 	switch vendor {
 	case "fortigate":
-		return importer.FortiOSImporter{}, nil
+		return importer.NewFortiOSImporter(), nil
 	default:
 		return nil, fmt.Errorf("unknown vendor")
 	}
@@ -97,10 +106,11 @@ func main() {
 	}
 
 	if a.ReadFileSpecified {
-		parseErr := parseDataFromFile(i, a.ReadFile)
+		device, parseErr := parseDataFromFile(i, a.ReadFile)
 		if parseErr != nil {
 			e(parseErr.Error())
 		}
+		o(fmt.Sprintf("%s", device))
 	}
 
 	os.Exit(0)
