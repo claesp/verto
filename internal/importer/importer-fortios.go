@@ -65,6 +65,7 @@ func (s *FortiOSSection) RowCount() int {
 
 type FortiOSImporter struct {
 	Section FortiOSSection
+	Device  types.VertoDevice
 }
 
 func NewFortiOSImporter() FortiOSImporter {
@@ -170,7 +171,7 @@ func NewFortiOSCommand(row FortiOSRow) FortiOSCommand {
 		o.Type = FortiOSCommandTypeUnknown
 	}
 
-	if len(row.Cols) > 1 {
+	if len(row.Cols) > 0 {
 		o.Command = strings.Join(row.Cols, " ")
 	}
 
@@ -204,18 +205,25 @@ func (f FortiOSImporter) parseSections(rows []FortiOSRow, section *FortiOSSectio
 		section.Rows = append(section.Rows, row)
 		command := f.parseCommand(row)
 		section.Commands = append(section.Commands, command)
+
 		if row.Cols[0] == "end" || row.Cols[0] == "next" {
 			break
 		}
 	}
 }
 
-func (f *FortiOSImporter) ImportFromText(s string) types.VertoDevice {
+func (f FortiOSImporter) Import(s string) error {
 	rows := f.parseRows(strings.Split(s, "\n"))
 	f.parseSections(rows[1:], &f.Section)
-
 	fmt.Fprintf(os.Stdout, "%s", f.Section)
-	d := types.VertoDevice{}
 
-	return d
+	return nil
+}
+
+func (f FortiOSImporter) Parse() error {
+	return fmt.Errorf("not implemented")
+}
+
+func (f FortiOSImporter) ExtractDevice() types.VertoDevice {
+	return f.Device
 }

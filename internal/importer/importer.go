@@ -5,5 +5,7 @@ import (
 )
 
 type Importer interface {
-	ImportFromText(s string) types.VertoDevice
+	Import(s string) error
+	Parse() error
+	ExtractDevice() types.VertoDevice
 }
