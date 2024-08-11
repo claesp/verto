@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/claesp/verto/internal/exporter"
 	"github.com/claesp/verto/internal/importer"
 	"github.com/claesp/verto/internal/parser"
 	"github.com/claesp/verto/internal/types"
@@ -25,10 +26,17 @@ func o(text string) {
 }
 
 type AppArguments struct {
-	VendorSpecified   bool
-	VendorName        string
-	ReadFileSpecified bool
-	ReadFile          string
+	ImportVendorSpecified bool
+	ImportVendorName      string
+	ExportVendorSpecified bool
+	ExportVendorName      string
+	ReadFileSpecified     bool
+	ReadFile              string
+}
+
+func help() {
+	s := fmt.Sprintf("usage: %s [-h | -v ] -i import_type -e export_type -f source_file", AppName)
+	o(s)
 }
 
 func parseArgs() AppArguments {
@@ -36,23 +44,31 @@ func parseArgs() AppArguments {
 
 	for i, arg := range os.Args {
 		switch arg {
+		case "-e":
+			a.ExportVendorSpecified = true
+			if len(os.Args) >= i+2 {
+				a.ExportVendorName = os.Args[i+1]
+			} else {
+				e("export: missing export vendor")
+			}
 		case "-f":
 			a.ReadFileSpecified = true
 			if len(os.Args) >= i+2 {
 				a.ReadFile = os.Args[i+1]
 			} else {
-				e("missing filename")
+				e("file: missing filename")
 			}
-		case "-t":
-			a.VendorSpecified = true
+		case "-i":
+			a.ImportVendorSpecified = true
 			if len(os.Args) >= i+2 {
-				a.VendorName = os.Args[i+1]
+				a.ImportVendorName = os.Args[i+1]
 			} else {
-				e("missing vendor")
+				e("import: missing import vendor")
 			}
 		case "-v":
-			fmt.Fprintf(os.Stdout, "%s %s\n", AppName, Version)
-			os.Exit(0)
+			o(fmt.Sprintf("%s %s", AppName, Version))
+		case "-h":
+			help()
 		}
 	}
 
@@ -70,6 +86,9 @@ func loadDataFromFile(filename string) ([]byte, error) {
 
 func parseDataFromFile(importer importer.Importer, filename string) (types.VertoDevice, error) {
 	var device types.VertoDevice
+	if importer == nil {
+		return device, fmt.Errorf("missing importer")
+	}
 
 	data, loadErr := loadDataFromFile(filename)
 	if loadErr != nil {
@@ -89,28 +108,57 @@ func selectVendorImporter(vendor string) (importer.Importer, error) {
 	case "fortigate":
 		return importer.NewFortiOSImporter(), nil
 	default:
-		return nil, fmt.Errorf("unknown vendor")
+		return nil, fmt.Errorf("unknown import vendor")
+	}
+}
+
+func selectVendorExporter(vendor string) (exporter.Exporter, error) {
+	switch vendor {
+	case "excel":
+		return exporter.NewExcelExporter(), nil
+	default:
+		return nil, fmt.Errorf("unknown export vendor")
 	}
 }
 
 func main() {
+	if len(os.Args) == 1 {
+		help()
+	}
+
 	a := parseArgs()
 
-	var i importer.Importer
-	if a.VendorSpecified {
-		var vendErr error
-		i, vendErr = selectVendorImporter(a.VendorName)
-		if vendErr != nil {
-			e(vendErr.Error())
+	var imp importer.Importer
+	if a.ImportVendorSpecified {
+		var importErr error
+		imp, importErr = selectVendorImporter(a.ImportVendorName)
+		if importErr != nil {
+			e(importErr.Error())
 		}
+	} else {
+		e("missing importer")
+	}
+
+	var exp exporter.Exporter
+	if a.ExportVendorSpecified {
+		var exportErr error
+		exp, exportErr = selectVendorExporter(a.ExportVendorName)
+		if exportErr != nil {
+			e(exportErr.Error())
+		}
+	} else {
+		e("missing exporter")
 	}
 
 	if a.ReadFileSpecified {
-		device, parseErr := parseDataFromFile(i, a.ReadFile)
+		device, parseErr := parseDataFromFile(imp, a.ReadFile)
 		if parseErr != nil {
 			e(parseErr.Error())
 		}
-		o(fmt.Sprintf("%s", device))
+
+		exp.Export(device)
+	} else {
+		e("no filename specified")
 	}
 
 	os.Exit(0)

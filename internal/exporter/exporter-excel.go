@@ -7,5 +7,9 @@ import (
 type ExcelExporter struct {
 }
 
-func (e *ExcelExporter) Export(vd types.VertoDevice) {
+func NewExcelExporter() ExcelExporter {
+	return ExcelExporter{}
+}
+
+func (e ExcelExporter) Export(vd types.VertoDevice) {
 }
